@@ -17,13 +17,26 @@ import {
   Briefcase,
   ChevronDown,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  MessageSquare,
+  Image as ImageIcon,
+  Search,
+  Send,
+  User,
+  Bot,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 
 // Types for our categories
 type Category = 'pemasaran' | 'sebutharga' | 'appsheet' | 'lookerstudio' | 'website' | 'onepagereport' | 'tender' | 'analisiskewangan' | 'cashflow' | 'pengurusanprojek' | 'ganttchart';
+type AppMode = 'expert' | 'chat' | 'image';
+
+interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+}
 
 interface InputFields {
   servis?: string;
@@ -56,12 +69,22 @@ interface InputFields {
 }
 
 export default function App() {
+  const [mode, setMode] = useState<AppMode>('expert');
   const [category, setCategory] = useState<Category>('pemasaran');
   const [inputs, setInputs] = useState<InputFields>({});
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+
+  // Chat State
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+
+  // Image Lab State
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [imageSize, setImageSize] = useState<'1K' | '2K' | '4K'>('1K');
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
@@ -153,19 +176,21 @@ export default function App() {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-3-flash-preview",
         contents: [{ parts: [{ text: promptText }] }],
         config: {
+          tools: [{ googleSearch: {} }],
           systemInstruction: `Anda adalah Ketua Pegawai Operasi (COO), Pakar Strategi Pendigitalan, dan Jurutera Eksekutif Bertaraf Dunia yang berkhidmat secara eksklusif untuk syarikat "BENA FLASH GLOBAL PLT".
 Matlamat anda adalah untuk sentiasa menghasilkan kerja bertahap 10/10. Gunakan bahasa Melayu korporat, profesional, dan padat.
 
 ARAHAN WAJIB (SANGAT PENTING):
 1. Jawab permintaan pengguna secara TERUS dan TEPAT (berikan skrip, kod, atau laporan yang diminta dengan kualiti tertinggi).
 2. Gunakan format Markdown yang kemas dengan pengasingan bahagian yang jelas menggunakan '###' untuk sub-tajuk.
-3. Di hujung jawapan anda, anda WAJIB mencipta satu tajuk baharu: "### 💡 CADANGAN PAKAR (1000X LEBIH KUAT)".
-4. Dalam bahagian "Cadangan Pakar" tersebut, cadangkan inovasi, aliran kerja (workflow), teknologi baharu (seperti automasi AI, IoT, atau strategi perniagaan tahap elit) yang JAUH LEBIH HEBAT daripada apa yang pengguna asalnya minta. Tunjukkan kepakaran sebenar BENA FLASH GLOBAL PLT.
-5. Akhir sekali, anda WAJIB menyediakan satu bahagian bertajuk "### 🚀 PROMPT MASTER (PROMPT ENGINEERING TAHAP TINGGI)".
-6. Bahagian ini mestilah mengandungi satu prompt lengkap yang boleh disalin dan digunakan pada mana-mana LLM (seperti ChatGPT, Claude, atau Gemini) untuk melaksanakan tugasan yang sama dengan kualiti pakar. Prompt ini mestilah menggunakan teknik prompt engineering tahap tertinggi (Persona, Konteks, Objektif, Kekangan, Format Output).`,
+3. Gunakan alat Google Search untuk mendapatkan maklumat terkini jika perlu (terutama untuk tender, analisis pasaran, dan teknologi).
+4. Di hujung jawapan anda, anda WAJIB mencipta satu tajuk baharu: "### 💡 CADANGAN PAKAR (1000X LEBIH KUAT)".
+5. Dalam bahagian "Cadangan Pakar" tersebut, cadangkan inovasi, aliran kerja (workflow), teknologi baharu (seperti automasi AI, IoT, atau strategi perniagaan tahap elit) yang JAUH LEBIH HEBAT daripada apa yang pengguna asalnya minta. Tunjukkan kepakaran sebenar BENA FLASH GLOBAL PLT.
+6. Akhir sekali, anda WAJIB menyediakan satu bahagian bertajuk "### 🚀 PROMPT MASTER (PROMPT ENGINEERING TAHAP TINGGI)".
+7. Bahagian ini mestilah mengandungi satu prompt lengkap yang boleh disalin dan digunakan pada mana-mana LLM (seperti ChatGPT, Claude, atau Gemini) untuk melaksanakan tugasan yang sama dengan kualiti pakar. Prompt ini mestilah menggunakan teknik prompt engineering tahap tertinggi (Persona, Konteks, Objektif, Kekangan, Format Output).`,
         }
       });
 
@@ -173,6 +198,69 @@ ARAHAN WAJIB (SANGAT PENTING):
     } catch (error: any) {
       console.error(error);
       setResult(`**Ralat Sistem:** Gagal berhubung dengan pelayan AI. Sila cuba lagi sebentar lagi.\n\nButiran teknikal: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!chatInput.trim()) return;
+    
+    const userMsg: ChatMessage = { role: 'user', text: chatInput };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    setLoading(true);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [...chatMessages, userMsg].map(m => ({ role: m.role, parts: [{ text: m.text }] })),
+        config: {
+          tools: [{ googleSearch: {} }],
+          systemInstruction: "Anda adalah asisten AI pakar dari BENA FLASH GLOBAL PLT. Berikan jawapan yang sangat profesional, teknikal, dan berwibawa dalam Bahasa Melayu. Gunakan format Markdown yang kemas dengan pengasingan bahagian yang jelas menggunakan '###' untuk sub-tajuk. Gunakan Google Search untuk fakta terkini."
+        }
+      });
+
+      const modelMsg: ChatMessage = { role: 'model', text: response.text || "Maaf, saya tidak dapat memproses permintaan anda." };
+      setChatMessages(prev => [...prev, modelMsg]);
+    } catch (error: any) {
+      console.error(error);
+      tunjukToast("Ralat menghantar mesej.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!imagePrompt.trim()) return;
+    
+    setLoading(true);
+    setGeneratedImage(null);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-image-preview',
+        contents: { parts: [{ text: imagePrompt }] },
+        config: {
+          imageConfig: {
+            aspectRatio: "16:9",
+            imageSize: imageSize
+          }
+        },
+      });
+
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          setGeneratedImage(`data:image/png;base64,${part.inlineData.data}`);
+          tunjukToast("Imej berjaya dijana!");
+          break;
+        }
+      }
+    } catch (error: any) {
+      console.error(error);
+      tunjukToast("Ralat menjana imej.");
     } finally {
       setLoading(false);
     }
@@ -410,7 +498,7 @@ ARAHAN WAJIB (SANGAT PENTING):
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-10"
+          className="text-center mb-8"
         >
           <div className="inline-flex items-center justify-center p-4 bg-blue-600 rounded-2xl mb-4 shadow-[0_0_30px_rgba(37,99,235,0.4)]">
             <Zap className="h-10 w-10 text-white fill-white" />
@@ -419,76 +507,254 @@ ARAHAN WAJIB (SANGAT PENTING):
             BENA FLASH <span className="text-blue-500">GLOBAL PLT</span>
           </h1>
           <p className="text-blue-200 mt-3 text-sm md:text-base font-medium tracking-wide uppercase">
-            Sistem Pakar AI & Pendigitalan Korporat (V3)
+            Sistem Pakar AI & Pendigitalan Korporat (V4)
           </p>
         </motion.div>
 
-        {/* Main Card */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 border border-slate-700"
-        >
-          <div className="mb-6">
-            <label htmlFor="kategori" className="block text-sm font-bold text-slate-300 mb-2">Pilih Kepakaran Yang Anda Perlukan:</label>
-            <div className="relative">
-              <select 
-                id="kategori" 
-                value={category}
-                onChange={(e) => setCategory(e.target.value as Category)}
-                className="block w-full appearance-none bg-slate-900 border border-slate-600 text-white py-4 px-5 pr-12 rounded-xl leading-tight focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer font-medium text-lg"
-              >
-                <optgroup label="Pengurusan Pelanggan & Pemasaran">
-                  <option value="pemasaran">📢 Hasilkan Iklan Tular (Copywriting Premium)</option>
-                  <option value="sebutharga">📝 Draf Surat Iringan Sebut Harga Korporat</option>
-                </optgroup>
-                <optgroup label="Pendigitalan & Automasi (Level Pro)">
-                  <option value="appsheet">📱 Penjana Formula AppSheet (Automasi)</option>
-                  <option value="lookerstudio">📊 Struktur Dashboard Looker Studio</option>
-                  <option value="website">🌐 Rangka Struktur Website Korporat</option>
-                </optgroup>
-                <optgroup label="Pengurusan Projek & Korporat">
-                  <option value="onepagereport">📄 Laporan Eksekutif (One-Page Report)</option>
-                  <option value="tender">💼 Penulisan Strategik Bidaan Tender</option>
-                  <option value="pengurusanprojek">🏗️ Pelan Pengurusan Projek (PMP)</option>
-                  <option value="ganttchart">📅 Struktur Carta Gantt (Timeline)</option>
-                </optgroup>
-                <optgroup label="Analisis Kewangan & Strategi">
-                  <option value="analisiskewangan">💰 Analisis Untung Rugi (Financial)</option>
-                  <option value="cashflow">📉 Unjuran Aliran Tunai (Cash Flow)</option>
-                </optgroup>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
-                <ChevronDown className="h-5 w-5" />
-              </div>
-            </div>
-          </div>
-
-          <div className="w-full h-px bg-slate-700 my-6"></div>
-
-          {/* Dynamic Fields Container */}
-          <div className="space-y-5">
-            {renderFields()}
-          </div>
-
-          {/* Generate Button */}
+        {/* Navigation Tabs */}
+        <div className="flex bg-slate-800/50 p-1 rounded-2xl mb-8 border border-slate-700 max-w-md mx-auto">
           <button 
-            onClick={generateAIResponse}
-            disabled={loading}
-            className="w-full mt-8 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-slate-600 disabled:to-slate-700 text-white font-black text-lg py-4 px-6 rounded-xl shadow-[0_10px_20px_rgba(37,99,235,0.3)] transition-all transform hover:-translate-y-1 active:translate-y-0 flex justify-center items-center gap-3"
+            onClick={() => setMode('expert')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'expert' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
           >
-            {loading ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
-            ) : (
-              <Zap className="h-6 w-6 fill-current" />
-            )}
-            <span>{getButtonText()}</span>
+            <Briefcase className="h-4 w-4" />
+            Sistem Pakar
           </button>
-        </motion.div>
+          <button 
+            onClick={() => setMode('chat')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'chat' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+          >
+            <MessageSquare className="h-4 w-4" />
+            AI Chat
+          </button>
+          <button 
+            onClick={() => setMode('image')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'image' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+          >
+            <ImageIcon className="h-4 w-4" />
+            Image Lab
+          </button>
+        </div>
 
-        {/* Result Section */}
+        {/* Main Content Area */}
+        <AnimatePresence mode="wait">
+          {mode === 'expert' && (
+            <motion.div 
+              key="expert"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="bg-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 border border-slate-700"
+            >
+              <div className="mb-6">
+                <label htmlFor="kategori" className="block text-sm font-bold text-slate-300 mb-2">Pilih Kepakaran Yang Anda Perlukan:</label>
+                <div className="relative">
+                  <select 
+                    id="kategori" 
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as Category)}
+                    className="block w-full appearance-none bg-slate-900 border border-slate-600 text-white py-4 px-5 pr-12 rounded-xl leading-tight focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer font-medium text-lg"
+                  >
+                    <optgroup label="Pengurusan Pelanggan & Pemasaran">
+                      <option value="pemasaran">📢 Hasilkan Iklan Tular (Copywriting Premium)</option>
+                      <option value="sebutharga">📝 Draf Surat Iringan Sebut Harga Korporat</option>
+                    </optgroup>
+                    <optgroup label="Pendigitalan & Automasi (Level Pro)">
+                      <option value="appsheet">📱 Penjana Formula AppSheet (Automasi)</option>
+                      <option value="lookerstudio">📊 Struktur Dashboard Looker Studio</option>
+                      <option value="website">🌐 Rangka Struktur Website Korporat</option>
+                    </optgroup>
+                    <optgroup label="Pengurusan Projek & Korporat">
+                      <option value="onepagereport">📄 Laporan Eksekutif (One-Page Report)</option>
+                      <option value="tender">💼 Penulisan Strategik Bidaan Tender</option>
+                      <option value="pengurusanprojek">🏗️ Pelan Pengurusan Projek (PMP)</option>
+                      <option value="ganttchart">📅 Struktur Carta Gantt (Timeline)</option>
+                    </optgroup>
+                    <optgroup label="Analisis Kewangan & Strategi">
+                      <option value="analisiskewangan">💰 Analisis Untung Rugi (Financial)</option>
+                      <option value="cashflow">📉 Unjuran Aliran Tunai (Cash Flow)</option>
+                    </optgroup>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
+                    <ChevronDown className="h-5 w-5" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full h-px bg-slate-700 my-6"></div>
+
+              {/* Dynamic Fields Container */}
+              <div className="space-y-5">
+                {renderFields()}
+              </div>
+
+              {/* Generate Button */}
+              <button 
+                onClick={generateAIResponse}
+                disabled={loading}
+                className="w-full mt-8 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-slate-600 disabled:to-slate-700 text-white font-black text-lg py-4 px-6 rounded-xl shadow-[0_10px_20px_rgba(37,99,235,0.3)] transition-all transform hover:-translate-y-1 active:translate-y-0 flex justify-center items-center gap-3"
+              >
+                {loading ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <Zap className="h-6 w-6 fill-current" />
+                )}
+                <span>{getButtonText()}</span>
+              </button>
+            </motion.div>
+          )}
+
+          {mode === 'chat' && (
+            <motion.div 
+              key="chat"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="bg-slate-800 rounded-3xl shadow-2xl border border-slate-700 flex flex-col h-[600px] overflow-hidden"
+            >
+              <div className="p-4 border-bottom border-slate-700 bg-slate-800/50 flex items-center gap-3">
+                <div className="p-2 bg-blue-600 rounded-lg">
+                  <MessageSquare className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">BENA Chat AI</h3>
+                  <p className="text-xs text-slate-400">Pakar Strategi Digital Anda</p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
+                {chatMessages.length === 0 && (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                    <Bot className="h-12 w-12 text-slate-600 mb-4" />
+                    <h4 className="text-lg font-bold text-slate-300">Selamat Datang ke BENA Chat</h4>
+                    <p className="text-sm text-slate-500 max-w-xs">Tanya apa sahaja mengenai strategi perniagaan, teknologi, atau bantuan korporat.</p>
+                  </div>
+                )}
+                {chatMessages.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-900 text-slate-200 rounded-tl-none border border-slate-700'}`}>
+                      <div className="flex items-center gap-2 mb-1 opacity-50 text-[10px] font-bold uppercase tracking-wider">
+                        {msg.role === 'user' ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
+                        {msg.role === 'user' ? 'Anda' : 'BENA AI'}
+                      </div>
+                      <div className="prose prose-invert prose-sm max-w-none">
+                        <Markdown>{msg.text}</Markdown>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {loading && (
+                  <div className="flex justify-start">
+                    <div className="bg-slate-900 p-4 rounded-2xl rounded-tl-none border border-slate-700">
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-slate-900/50 border-t border-slate-700">
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Tulis mesej anda di sini..."
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all"
+                  />
+                  <button 
+                    onClick={handleSendMessage}
+                    disabled={loading || !chatInput.trim()}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white p-3 rounded-xl transition-all"
+                  >
+                    <Send className="h-6 w-6" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {mode === 'image' && (
+            <motion.div 
+              key="image"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="bg-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 border border-slate-700"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-purple-600 rounded-xl">
+                  <ImageIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">AI Image Lab</h3>
+                  <p className="text-sm text-slate-400">Visualisasikan Idea Perniagaan Anda</p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Terangkan Imej Yang Anda Mahukan:</label>
+                  <textarea 
+                    value={imagePrompt}
+                    onChange={(e) => setImagePrompt(e.target.value)}
+                    rows={4}
+                    className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 transition-all"
+                    placeholder="Cth: Reka bentuk pejabat korporat moden dengan elemen futuristik, pencahayaan neon biru, kualiti 4K, sinematik..."
+                  ></textarea>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  {(['1K', '2K', '4K'] as const).map((size) => (
+                    <button
+                      key={size}
+                      onClick={() => setImageSize(size)}
+                      className={`py-3 rounded-xl font-bold text-sm transition-all border ${imageSize === size ? 'bg-blue-600 border-blue-500 text-white shadow-lg' : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                    >
+                      {size} Resolution
+                    </button>
+                  ))}
+                </div>
+
+                <button 
+                  onClick={handleGenerateImage}
+                  disabled={loading || !imagePrompt.trim()}
+                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-slate-700 disabled:to-slate-800 text-white font-black text-lg py-4 px-6 rounded-xl shadow-xl transition-all flex justify-center items-center gap-3"
+                >
+                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Sparkles className="h-6 w-6" />}
+                  Jana Visual Sekarang
+                </button>
+
+                {generatedImage && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="mt-8 rounded-2xl overflow-hidden border-4 border-slate-700 shadow-2xl relative group"
+                  >
+                    <img src={generatedImage} alt="Generated" className="w-full h-auto" />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                      <button 
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = generatedImage;
+                          link.download = 'bena-ai-visual.png';
+                          link.click();
+                        }}
+                        className="bg-white text-black px-6 py-2 rounded-full font-bold hover:bg-blue-500 hover:text-white transition-all"
+                      >
+                        Muat Turun
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Result Section (Only for Expert Mode) */}
         <AnimatePresence>
-          {result && (
+          {mode === 'expert' && result && (
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

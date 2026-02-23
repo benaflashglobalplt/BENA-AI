@@ -1,5 +1,5 @@
 {
-  "name": "BENA FLASH GLOBAL - AI Expert System",
-  "description": "Sistem Pakar AI & Pendigitalan Korporat untuk pengurusan pelanggan, pemasaran, automasi AppSheet, dan bidaan tender.",
-  "requestFramePermissions": []
+  "name": "BENA FLASH GLOBAL - AI Multi-Pakar (V4)",
+  "description": "Sistem Pakar AI, Chatbot Pintar, dan AI Image Lab untuk pendigitalan korporat, pemasaran, dan automasi perniagaan.",
+  "requestFramePermissions": ["microphone", "geolocation", "camera"]
 }
