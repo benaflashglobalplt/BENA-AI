@@ -153,7 +153,7 @@ export default function App() {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-pro-preview",
         contents: [{ parts: [{ text: promptText }] }],
         config: {
           systemInstruction: `Anda adalah Ketua Pegawai Operasi (COO), Pakar Strategi Pendigitalan, dan Jurutera Eksekutif Bertaraf Dunia yang berkhidmat secara eksklusif untuk syarikat "BENA FLASH GLOBAL PLT".
